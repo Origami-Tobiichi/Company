@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth/session'
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
+
   const publicPaths = ['/login', '/register', '/api/auth/login', '/api/auth/register']
   const isPublic = publicPaths.some(p => path.startsWith(p))
   const isApi = path.startsWith('/api')
@@ -32,4 +33,6 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
