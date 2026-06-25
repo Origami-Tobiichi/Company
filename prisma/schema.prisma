@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  address     String?
+  phone       String?
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employees   Employee[]
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  nip         String   @unique
+  name        String
+  email       String   @unique
+  password    String
+  phone       String?
+  address     String?
+  position    String?
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role        Role     @default(EMPLOYEE)
+  faceData    String?   // URL foto
+  faceEmbedding String? // JSON array
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  attendances Attendance[]
+  otRequests  OvertimeRequest[]
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+model Attendance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  checkIn     DateTime?
+  checkOut    DateTime?
+  checkInPhoto String?
+  checkOutPhoto String?
+  checkInLocation String?
+  checkOutLocation String?
+  duty        String?
+  status      AttendanceStatus @default(PRESENT)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  overtimeRequests OvertimeRequest[]
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  OVERTIME
+}
+
+model OvertimeRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceId String?
+  attendance  Attendance? @relation(fields: [attendanceId], references: [id])
+  date        DateTime @default(now())
+  startTime   DateTime
+  endTime     DateTime
+  description String?
+  duration    Float
+  status      OvertimeStatus @default(PENDING)
+  approvedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
