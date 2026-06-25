@@ -7,16 +7,15 @@ const nextConfig = {
     serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
   },
   webpack: (config, { isServer }) => {
-    // Menangani modul 'fs' dan 'encoding' yang digunakan oleh face-api.js
     if (!isServer) {
       config.resolve.fallback = {
         fs: false,
         encoding: false,
         ...config.resolve.fallback,
-      };
+      }
     }
-    return config;
+    return config
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
