@@ -1,6 +1,5 @@
 import { cookies } from 'next/headers'
 import { jwtVerify, SignJWT } from 'jose'
-import { redis } from '@/lib/db/redis'
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'secret')
 
@@ -34,18 +33,8 @@ export async function getSession(): Promise<SessionPayload | null> {
     const token = cookieStore.get('session')?.value
     if (!token) return null
 
-    // Coba dari cache
-    try {
-      const cached = await redis.get(`session:${token}`)
-      if (cached) return JSON.parse(cached as string)
-    } catch {}
-
+    // Verifikasi langsung tanpa cache Redis
     const payload = await verifyToken(token)
-    if (payload) {
-      try {
-        await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 })
-      } catch {}
-    }
     return payload
   } catch (error) {
     console.error('getSession error:', error)
@@ -57,11 +46,6 @@ export async function setSession(payload: SessionPayload) {
   try {
     const cookieStore = cookies()
     const token = await generateToken(payload)
-
-    try {
-      await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 })
-    } catch {}
-
     cookieStore.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -79,12 +63,6 @@ export async function setSession(payload: SessionPayload) {
 export async function clearSession() {
   try {
     const cookieStore = cookies()
-    const token = cookieStore.get('session')?.value
-    if (token) {
-      try {
-        await redis.del(`session:${token}`)
-      } catch {}
-    }
     cookieStore.delete('session')
   } catch (error) {
     console.error('clearSession error:', error)
