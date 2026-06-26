@@ -5,28 +5,41 @@ import { getSession } from '@/lib/auth/session'
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
 
-  const publicPaths = ['/login', '/register', '/api/auth/login', '/api/auth/register']
-  const isPublic = publicPaths.some(p => path.startsWith(p))
-  const isApi = path.startsWith('/api')
-  const isStatic = path.startsWith('/_next') || path.startsWith('/favicon.ico') || path.startsWith('/models')
+  // Static files - biarkan akses
+  if (
+    path.startsWith('/_next') ||
+    path.startsWith('/favicon.ico') ||
+    path.startsWith('/models') ||
+    path.startsWith('/api')
+  ) {
+    return NextResponse.next()
+  }
 
-  if (isStatic) return NextResponse.next()
+  // Public paths yang boleh diakses tanpa login
+  const publicPaths = ['/login', '/register']
+  const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + '?'))
 
+  // Ambil session
   const session = await getSession()
-  const isAuth = !!session
+  const isAuthenticated = !!session
 
-  if (!isAuth && !isPublic) {
+  // Jika sudah login dan mencoba akses public path → redirect ke dashboard
+  if (isAuthenticated && isPublicPath) {
+    const redirectUrl = session.role === 'ADMIN' ? '/admin' : '/employee'
+    return NextResponse.redirect(new URL(redirectUrl, request.url))
+  }
+
+  // Jika belum login dan mencoba akses protected path → redirect ke login
+  if (!isAuthenticated && !isPublicPath && !path.startsWith('/api')) {
     const url = new URL('/login', request.url)
-    if (path.startsWith('/admin')) url.searchParams.set('role', 'ADMIN')
+    if (path.startsWith('/admin')) {
+      url.searchParams.set('role', 'ADMIN')
+    }
     return NextResponse.redirect(url)
   }
 
-  if (isAuth && isPublic && !isApi) {
-    const redirect = session.role === 'ADMIN' ? '/admin' : '/employee'
-    return NextResponse.redirect(new URL(redirect, request.url))
-  }
-
-  if (isAuth && path.startsWith('/admin') && session.role !== 'ADMIN') {
+  // Jika role tidak sesuai untuk /admin
+  if (isAuthenticated && path.startsWith('/admin') && session.role !== 'ADMIN') {
     return NextResponse.redirect(new URL('/employee', request.url))
   }
 
@@ -34,5 +47,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 }
