@@ -1,24 +1,40 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic' // ✅ Mencegah error DYNAMIC_SERVER_USAGE
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { name, email, password, nip, companyName, phone, address } = await req.json()
 
-    // Cek duplikat
+    // 🔍 Validasi input wajib
+    if (!name || !email || !password || !nip || !companyName) {
+      return NextResponse.json(
+        { error: 'Nama, email, password, NIP, dan nama perusahaan wajib diisi' },
+        { status: 400 }
+      )
+    }
+
+    // Cek duplikat email atau NIP
     const existing = await prisma.employee.findFirst({
       where: { OR: [{ email }, { nip }] },
     })
     if (existing) {
-      return NextResponse.json({ error: 'Email atau NIP sudah terdaftar' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Email atau NIP sudah terdaftar' },
+        { status: 400 }
+      )
     }
 
-    // Buat perusahaan jika belum ada
-    let company = await prisma.company.findUnique({ where: { name: companyName } })
+    // Cari atau buat perusahaan
+    let company = await prisma.company.findFirst({
+      where: { name: companyName },
+    })
+
     if (!company) {
+      // Buat perusahaan baru
       company = await prisma.company.create({
         data: {
           name: companyName,
@@ -28,8 +44,10 @@ export async function POST(req: Request) {
       })
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // Buat employee (admin)
     const employee = await prisma.employee.create({
       data: {
         nip,
@@ -39,18 +57,26 @@ export async function POST(req: Request) {
         phone: phone || '',
         address: address || '',
         companyId: company.id,
-        role: 'ADMIN', // User pertama adalah admin
+        role: 'ADMIN',
         isActive: true,
       },
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Registrasi berhasil',
-      employee: { id: employee.id, name, email, nip },
+      message: 'Registrasi berhasil! Silakan login.',
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        nip: employee.nip,
+      },
     })
   } catch (error) {
     console.error('Register error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Terjadi kesalahan pada server' },
+      { status: 500 }
+    )
   }
 }
