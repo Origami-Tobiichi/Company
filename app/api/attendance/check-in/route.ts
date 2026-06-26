@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+ 
     const formData = await req.formData()
     const lat = parseFloat(formData.get('lat') as string)
     const lng = parseFloat(formData.get('lng') as string)
