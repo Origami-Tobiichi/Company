@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const { name, email, password, nip, companyName, phone, address } = await req.json()
 
-    // Validasi
+    // ✅ Validasi input
     if (!name || !email || !password || !nip || !companyName) {
       return NextResponse.json(
         { error: 'Semua field wajib diisi' },
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Cek duplikat
+    // ✅ Cek duplikat email atau NIP
     const existing = await prisma.employee.findFirst({
       where: { OR: [{ email }, { nip }] },
     })
@@ -28,16 +28,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Cari atau buat perusahaan
+    // ✅ Cari atau buat perusahaan
     let company = await prisma.company.findFirst({
       where: { name: companyName },
     })
 
     if (!company) {
+      // Buat kode unik dari nama (6 huruf kapital + angka jika perlu)
+      let baseCode = companyName.slice(0, 6).toUpperCase()
+      
+      // Cek apakah kode sudah dipakai
+      let existingCompany = await prisma.company.findFirst({
+        where: { code: baseCode },
+      })
+      if (existingCompany) {
+        // Tambahkan angka acak 2 digit
+        baseCode = baseCode + Math.floor(10 + Math.random() * 90).toString()
+      }
+
       company = await prisma.company.create({
         data: {
           name: companyName,
-          code: companyName.slice(0, 6).toUpperCase(),
+          code: baseCode,
           phone: phone || '',
         },
       })
@@ -45,6 +57,7 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // ✅ Buat employee dengan role ADMIN
     const employee = await prisma.employee.create({
       data: {
         nip,
@@ -61,18 +74,19 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Registrasi berhasil',
+      message: 'Registrasi berhasil! Silakan login.',
       employee: {
         id: employee.id,
         name: employee.name,
         email: employee.email,
         nip: employee.nip,
+        company: company.name,
       },
     })
   } catch (error: any) {
     console.error('Register error:', error)
 
-    // Tangani error Prisma dengan lebih baik
+    // ✅ Tangani error Prisma
     if (error.code === 'P1001' || error.message?.includes('DATABASE_URL')) {
       return NextResponse.json(
         { error: 'Koneksi database gagal. Periksa DATABASE_URL.' },
@@ -80,8 +94,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // ✅ Tangani error unique constraint
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Data sudah terdaftar (duplikat).' },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Terjadi kesalahan pada server' },
+      { error: 'Terjadi kesalahan pada server. Silakan coba lagi.' },
       { status: 500 }
     )
   }
