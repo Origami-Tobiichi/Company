@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { clearSession } from '@/lib/auth/session'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'  // ✅ Wajib untuk API yang pakai cookies
 
 export async function POST() {
   try {
