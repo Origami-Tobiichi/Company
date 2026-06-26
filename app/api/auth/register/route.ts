@@ -3,21 +3,21 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic' // ✅ Mencegah error DYNAMIC_SERVER_USAGE
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
     const { name, email, password, nip, companyName, phone, address } = await req.json()
 
-    // 🔍 Validasi input wajib
+    // Validasi
     if (!name || !email || !password || !nip || !companyName) {
       return NextResponse.json(
-        { error: 'Nama, email, password, NIP, dan nama perusahaan wajib diisi' },
+        { error: 'Semua field wajib diisi' },
         { status: 400 }
       )
     }
 
-    // Cek duplikat email atau NIP
+    // Cek duplikat
     const existing = await prisma.employee.findFirst({
       where: { OR: [{ email }, { nip }] },
     })
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
     })
 
     if (!company) {
-      // Buat perusahaan baru
       company = await prisma.company.create({
         data: {
           name: companyName,
@@ -44,10 +43,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Buat employee (admin)
     const employee = await prisma.employee.create({
       data: {
         nip,
@@ -64,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Registrasi berhasil! Silakan login.',
+      message: 'Registrasi berhasil',
       employee: {
         id: employee.id,
         name: employee.name,
@@ -72,8 +69,17 @@ export async function POST(req: NextRequest) {
         nip: employee.nip,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register error:', error)
+
+    // Tangani error Prisma dengan lebih baik
+    if (error.code === 'P1001' || error.message?.includes('DATABASE_URL')) {
+      return NextResponse.json(
+        { error: 'Koneksi database gagal. Periksa DATABASE_URL.' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Terjadi kesalahan pada server' },
       { status: 500 }
