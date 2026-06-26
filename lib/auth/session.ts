@@ -29,36 +29,66 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-  const token = cookies().get('session')?.value
-  if (!token) return null
   try {
-    const cached = await redis.get(`session:${token}`)
-    if (cached) return JSON.parse(cached as string)
-  } catch {}
-  const payload = await verifyToken(token)
-  if (payload) {
-    try { await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 }) } catch {}
+    const cookieStore = cookies()
+    const token = cookieStore.get('session')?.value
+    if (!token) return null
+
+    // Coba dari cache
+    try {
+      const cached = await redis.get(`session:${token}`)
+      if (cached) return JSON.parse(cached as string)
+    } catch {}
+
+    const payload = await verifyToken(token)
+    if (payload) {
+      try {
+        await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 })
+      } catch {}
+    }
+    return payload
+  } catch (error) {
+    console.error('getSession error:', error)
+    return null
   }
-  return payload
 }
 
 export async function setSession(payload: SessionPayload) {
-  const token = await generateToken(payload)
-  try { await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 }) } catch {}
-  cookies().set('session', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7,
-    path: '/',
-  })
-  return token
+  try {
+    const cookieStore = cookies()
+    const token = await generateToken(payload)
+
+    try {
+      await redis.set(`session:${token}`, JSON.stringify(payload), { ex: 3600 })
+    } catch {}
+
+    cookieStore.set('session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    })
+    return token
+  } catch (error) {
+    console.error('setSession error:', error)
+    throw error
+  }
 }
 
 export async function clearSession() {
-  const token = cookies().get('session')?.value
-  if (token) try { await redis.del(`session:${token}`) } catch {}
-  cookies().delete('session')
+  try {
+    const cookieStore = cookies()
+    const token = cookieStore.get('session')?.value
+    if (token) {
+      try {
+        await redis.del(`session:${token}`)
+      } catch {}
+    }
+    cookieStore.delete('session')
+  } catch (error) {
+    console.error('clearSession error:', error)
+  }
 }
 
 export function requireRole(roles: string[]) {
