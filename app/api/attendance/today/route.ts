@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
+import { getLocationError } from '@/lib/utils/location'
+import { put } from '@vercel/blob'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function POST(req: Request) {
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+ 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
