@@ -1,12 +1,10 @@
-import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/session'
+import { NextRequest, NextResponse } from 'next/server'  // ✅ import NextRequest
+import bcrypt from 'bcryptjs'                            // ✅ import bcrypt
 import { prisma } from '@/lib/db/prisma'
-import { getLocationError } from '@/lib/utils/location'
-import { put } from '@vercel/blob'
+import { setSession } from '@/lib/auth/session'          // ✅ import setSession
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
 
 export async function POST(req: NextRequest) {
   try {
